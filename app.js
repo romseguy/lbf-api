@@ -85,10 +85,10 @@ app.get('/download', (req, res, next) => {
   res.download(file);
 })
 
-app.get('/size', (req, res, next) => {
-  const id = req.query.orgId || req.query.eventId || req.query.userId || ""
-  const dirPath = `${root}/${id}`
-  const dirSize = await directorySize(dirPath)
+app.get('/size', async (req, res, next) => {
+  const id = req.query.orgId || req.query.eventId || req.query.userId || "";
+  const dirPath = `${root}/${id}`;
+  const dirSize = await directorySize(dirPath);
   return res.status(200).send({ current: dirSize, max: MAX_ALLOWED_SIZE });
 })
 
