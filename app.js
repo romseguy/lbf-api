@@ -11,7 +11,7 @@ const nodemailer = require('nodemailer')
 const nodemailerSendgrid = require('nodemailer-sendgrid')
 const { readdir, stat } = require('fs/promises');
 
-const MAX_ALLOWED_SIZE = 50000000 // 50Mb
+const MAX_ALLOWED_SIZE = 100000000 // 100Mb
 
 const directorySize = async directory => {
   const files = await readdir(directory);
@@ -86,12 +86,7 @@ app.get('/download', (req, res, next) => {
 })
 
 app.get('/size', (req, res, next) => {
-  const id = req.query.orgId || req.query.eventId || req.query.userId
-
-  if (!id) {
-    return res.status(400).send("Vous devez indiquer un id d'entité");
-  }
-
+  const id = req.query.orgId || req.query.eventId || req.query.userId || ""
   const dirPath = `${root}/${id}`
   const dirSize = await directorySize(dirPath)
   return res.status(200).send({ current: dirSize, max: MAX_ALLOWED_SIZE });
@@ -127,14 +122,14 @@ app.post('/', async (req, res, next) => {
     return res.status(400).send("Aucun fichier à envoyer");
   }
 
+  const dirSize = await directorySize(root)
+  if (dirSize > MAX_ALLOWED_SIZE) {
+    return res.status(400).send({ message: "Limite de 100Mo atteinte" });
+  }
+
   const id = req.body?.eventId || req.body?.orgId || req.body?.userId || "all"
   const dirPath = `${root}/${id}`
   mkdirp.sync(dirPath)
-  const dirSize = await directorySize(dirPath)
-
-  if (dirSize > MAX_ALLOWED_SIZE) {
-    return res.status(400).send({ message: "Limite de 50Mo atteinte" });
-  }
 
   const file = req.files.file
 
