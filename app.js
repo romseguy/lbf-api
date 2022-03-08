@@ -13,19 +13,19 @@ const { readdir, stat } = require('fs/promises');
 
 const MAX_ALLOWED_SIZE = 100000000 // 100Mb
 
-function getSize(path){
-// Get the size of a file or folder recursively
-let size = 0;
-if(fs.statSync(path).isDirectory()){
+function getSize(path) {
+  // Get the size of a file or folder recursively
+  let size = 0;
+  if (fs.statSync(path).isDirectory()) {
     const files = fs.readdirSync(path);
     files.forEach(file => {
-        size += getSize(path + "/" + file);
+      size += getSize(path + "/" + file);
     });
-}
-else{
+  }
+  else {
     size += fs.statSync(path).size;
-}
-return size;
+  }
+  return size;
 }
 
 const directorySize = async directory => {
@@ -102,10 +102,15 @@ app.get('/download', (req, res, next) => {
 })
 
 app.get('/size', async (req, res, next) => {
-  const id = req.query.orgId || req.query.eventId || req.query.userId || "";
-  const dirPath = `${root}/${id}`;
-  const dirSize = getSize(dirPath);
-  return res.status(200).json({ current: dirSize, max: MAX_ALLOWED_SIZE });
+  try {
+    const id = req.query.orgId || req.query.eventId || req.query.userId || "";
+    const dirPath = `${root}/${id}`;
+    const dirSize = getSize(dirPath);
+    return res.status(200).json({ current: dirSize, max: MAX_ALLOWED_SIZE });
+  } catch (error) {
+    console.error(error)
+    return res.status(500).send({ message: error.message });
+  }
 })
 
 app.get('/view', (req, res, next) => {
