@@ -13,6 +13,21 @@ const { readdir, stat } = require('fs/promises');
 
 const MAX_ALLOWED_SIZE = 100000000 // 100Mb
 
+function getSize(path){
+// Get the size of a file or folder recursively
+let size = 0;
+if(fs.statSync(path).isDirectory()){
+    const files = fs.readdirSync(path);
+    files.forEach(file => {
+        size += getSize(path + "/" + file);
+    });
+}
+else{
+    size += fs.statSync(path).size;
+}
+return size;
+}
+
 const directorySize = async directory => {
   const files = await readdir(directory);
   const stats = files.map(file => stat(path.join(directory, file)));
@@ -31,6 +46,7 @@ const transport = nodemailer.createTransport(
 const app = express()
 const port = 3000
 const root = `${__dirname}/files`
+mkdirp.sync(root)
 
 app.use(cors())
 app.use(express.json({ limit: '25mb' }))
@@ -88,8 +104,8 @@ app.get('/download', (req, res, next) => {
 app.get('/size', async (req, res, next) => {
   const id = req.query.orgId || req.query.eventId || req.query.userId || "";
   const dirPath = `${root}/${id}`;
-  const dirSize = await directorySize(dirPath);
-  return res.status(200).send({ current: dirSize, max: MAX_ALLOWED_SIZE });
+  const dirSize = getSize(dirPath);
+  return res.status(200).json({ current: dirSize, max: MAX_ALLOWED_SIZE });
 })
 
 app.get('/view', (req, res, next) => {
