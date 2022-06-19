@@ -11,7 +11,16 @@ const nodemailer = require('nodemailer')
 const nodemailerSendgrid = require('nodemailer-sendgrid')
 const { readdir, stat } = require('fs/promises');
 
-const MAX_ALLOWED_SIZE = 100000000 // 100Mb
+function bytesForHuman(bytes, decimals = 0) {
+  const units = ["o", "Ko", "Mo", "Go"];
+  let i = 0;
+
+  for (i; bytes > 1024; i++) {
+    bytes /= 1024;
+  }
+
+  return parseFloat(bytes.toFixed(decimals)) + units[i];
+}
 
 function getSize(path) {
   // Get the size of a file or folder recursively
@@ -34,9 +43,8 @@ const directorySize = async directory => {
 
   return (await Promise.all(stats)).reduce((accumulator, { size }) => accumulator + size, 0);
 }
-
+const MAX_ALLOWED_SIZE = 1000000000 // 1Gb
 const EMAIL_API_KEY = "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"
-
 const transport = nodemailer.createTransport(
   nodemailerSendgrid({
     apiKey: EMAIL_API_KEY
@@ -56,10 +64,9 @@ app.use(fu())
 // app.use('/', express.static("files"))
 
 app.get('/', (req, res, next) => {
-  const id = req.query.orgId || req.query.userId
+  const id = req.query.eventId || req.query.orgId || req.query.userId
   if (!id) {
-    res.status(400).send("Vous devez indiquer un id d'organisation ou d'utilisateur");
-    return;
+    return res.status(400).send("Vous devez indiquer un id");
   }
 
   const dir = `${root}/${id}`
@@ -85,19 +92,23 @@ app.get('/', (req, res, next) => {
   */
 })
 
+app.get('/check', (req, res, next) => {
+  res.status(200).send("check");
+})
+
 
 app.get('/download', (req, res, next) => {
-  if (!req.query.orgId) {
-    res.status(400).send("Vous devez indiquer un id d'organisation");
-    return;
+  const id = req.query.eventId || req.query.orgId || req.query.userId
+  if (!id) {
+    return res.status(400).send("Vous devez indiquer un id");
   }
 
   if (!req.query.fileName) {
-    res.status(400).send("Vous devez indiquer un nom de fichier");
-    return;
+    return res.status(400).send("Vous devez indiquer un nom de fichier");
   }
 
-  const file = `${__dirname}/files/${req.query.orgId}/${req.query.fileName}`;
+  const dirPath = `${root}/${id}`;
+  const file = `${dirPath}/${req.query.fileName}`;
   res.download(file);
 })
 
@@ -105,7 +116,7 @@ app.get('/size', async (req, res, next) => {
   try {
     const id = req.query.orgId || req.query.eventId || req.query.userId || "";
     const dirPath = `${root}/${id}`;
-    const dirSize = getSize(dirPath);
+    const dirSize = getSize(id ? dirPath : root);
     return res.status(200).json({ current: dirSize, max: MAX_ALLOWED_SIZE });
   } catch (error) {
     console.error(error)
@@ -114,7 +125,10 @@ app.get('/size', async (req, res, next) => {
 })
 
 app.get('/view', (req, res, next) => {
-  const id = req.query.orgId || req.query.eventId || req.query.userId || "all"
+  const id = req.query.eventId || req.query.orgId || req.query.userId
+  if (!id) {
+    return res.status(400).send("Vous devez indiquer un id");
+  }
 
   if (!req.query.fileName) {
     return res.status(400).send("Vous devez indiquer un nom de fichier");
@@ -139,20 +153,24 @@ app.get('/view', (req, res, next) => {
 })
 
 app.post('/', async (req, res, next) => {
-  if (!req.files || Object.keys(req.files).length === 0) {
-    return res.status(400).send("Aucun fichier à envoyer");
-  }
-
   const dirSize = await directorySize(root)
-  if (dirSize > MAX_ALLOWED_SIZE) {
-    return res.status(400).send({ message: "Limite de 100Mo atteinte" });
+  if (dirSize > MAX_ALLOWED_SIZE)
+    return res.status(400).send({ message: `Limite de ${bytesForHuman(MAX_ALLOWED_SIZE)} atteinte` });
+
+  const id = req.body?.eventId || req.body?.orgId || req.body?.userId
+  if (!id) {
+    return res.status(400).send("Vous devez indiquer un id");
   }
 
-  const id = req.body?.eventId || req.body?.orgId || req.body?.userId || "all"
-  const dirPath = `${root}/${id}`
-  mkdirp.sync(dirPath)
+  if (!req.files || Object.keys(req.files).length === 0)
+    return res.status(400).send("Aucun fichier à envoyer");
 
   const file = req.files.file
+  const fsMb = file.size / (1024 * 1024);
+  if (fsMb > 10) return req.status(400).send("Fichier trop volumineux");
+
+  const dirPath = `${root}/${id}`
+  mkdirp.sync(dirPath)
 
   if (file) {
     file.mv(
@@ -271,22 +289,46 @@ app.post('/mail', async (req, res, next) => {
 })
 
 app.delete('/', async (req, res, next) => {
-  if (!req.body.fileName)
+  const id = req.body?.orgId || req.body?.eventId || req.body?.userId
+  if (!id) {
+    return res.status(400).send("Vous devez indiquer un id");
+  }
+
+  if (!req.body?.fileName)
     return res.status(400).send({ message: "Veuillez spécifier le nom du document à supprimer" });
 
-  let uploadDir = req.body?.orgId || req.body?.userId
+  const dir = `${root}/${id}`
+  const filePath = path.join(dir, req.body.fileName)
 
-  const dir = `${root}/${uploadDir}`
-
-  if (!fs.existsSync(dir))
+  if (!fs.existsSync(dir) || !fs.existsSync(filePath))
     return res.status(400).send({ message: "Document introuvable" });
 
   try {
-    await fs.promises.unlink(path.join(dir, req.body.fileName))
+    await fs.promises.unlink(filePath)
     res.json({ fileName: req.body.fileName })
   } catch (error) {
     console.error(error)
     return res.status(500).send({ message: "Le document n'a pas pu être supprimé" });
+  }
+})
+
+app.delete('/folder', async (req, res, next) => {
+  const id = req.body?.eventId || req.body?.orgId || req.body?.userId
+  if (!id) {
+    return res.status(400).send("Vous devez indiquer un id");
+  }
+
+  const dir = `${root}/${id}`;
+
+  if (!fs.existsSync(dir))
+    return res.status(200).send({ message: "Dossier introuvable" });
+
+  try {
+    await fs.promises.rm(dir, { recursive: true, force: true })
+    res.json({ dirName: id })
+  } catch (error) {
+    console.error(error)
+    return res.status(500).send({ message: "Le dossier n'a pas pu être supprimé" });
   }
 })
 
