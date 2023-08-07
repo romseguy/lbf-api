@@ -1,46 +1,46 @@
-const fs = require('fs')
-const glob = require('glob')
-const mkdirp = require('mkdirp')
-const path = require('path')
-const stream = require('stream')
+const fs = require("fs");
+const glob = require("glob");
+const mkdirp = require("mkdirp");
+const path = require("path");
+const stream = require("stream");
 
-const express = require('express')
-const pino = require('pino');
-const expressPino = require('express-pino-logger');
-const cors = require('cors')
-const fu = require('express-fileupload')
+const express = require("express");
+const pino = require("pino");
+const expressPino = require("express-pino-logger");
+const cors = require("cors");
+const fu = require("express-fileupload");
 
-import sizeOf from "image-size"
-import {bytesForHuman, directorySize, getSize} from "./utils"
+import sizeOf from "image-size";
+import { bytesForHuman, directorySize, getSize } from "./utils";
 
-const MAX_ALLOWED_SIZE = 1000000000 // 1Gb
-const PORT = 3000
+const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
+const PORT = 3000;
 
-const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
-const root = `${__dirname}/files`
-mkdirp.sync(root)
+const logger = pino({ level: process.env.LOG_LEVEL || "info" });
+const root = `${__dirname}/files`;
+mkdirp.sync(root);
 
-const app = express()
+const app = express();
 app.use(expressPino({ logger }));
-app.use(cors())
-app.use(express.json({ limit: '25mb' }))
+app.use(cors());
+app.use(express.json({ limit: "25mb" }));
 //app.use(express.urlencoded({limit: '25mb'}));
-app.use(fu())
+app.use(fu());
 // app.use('/', express.static("files"))
 
-app.get('/', (req, res, next) => {
-  const id = req.query.eventId || req.query.orgId || req.query.userId
+app.get("/", function getDocuments(req, res, next) {
+  const id = req.query.eventId || req.query.orgId || req.query.userId;
   if (!id) {
     return res.status(400).send("Vous devez indiquer un id");
   }
 
-  const dir = `${root}/${id}`
+  const dir = `${root}/${id}`;
 
   glob(dir + "/*", {}, (err, files) => {
-    if (err) throw err
-    files = files.map(file => path.relative(dir, file))
-    res.send(files)
-  })
+    if (err) throw err;
+    files = files.map((file) => path.relative(dir, file));
+    res.send(files);
+  });
 
   /*   
   const files = []
@@ -55,14 +55,14 @@ app.get('/', (req, res, next) => {
     res.send(files);
   });
   */
-})
+});
 
-app.get('/check', (req, res, next) => {
+app.get("/check", (req, res, next) => {
   res.status(200).send("check");
-})
+});
 
-app.get('/download', (req, res, next) => {
-  const id = req.query.eventId || req.query.orgId || req.query.userId
+app.get("/download", (req, res, next) => {
+  const id = req.query.eventId || req.query.orgId || req.query.userId;
   if (!id) {
     return res.status(400).send("Vous devez indiquer un id");
   }
@@ -74,42 +74,42 @@ app.get('/download', (req, res, next) => {
   const dirPath = `${root}/${id}`;
   const file = `${dirPath}/${req.query.fileName}`;
   res.download(file);
-})
+});
 
-app.get('/dimensions', async (req, res, next) => {
+app.get("/dimensions", async (req, res, next) => {
   try {
-  const id = req.query.eventId || req.query.orgId || req.query.userId
-  if (!id) {
-    return res.status(400).send("Vous devez indiquer un id");
-  }
+    const id = req.query.eventId || req.query.orgId || req.query.userId;
+    if (!id) {
+      return res.status(400).send("Vous devez indiquer un id");
+    }
 
-  if (!req.query.fileName) {
-    return res.status(400).send("Vous devez indiquer un nom de fichier");
-  }
+    if (!req.query.fileName) {
+      return res.status(400).send("Vous devez indiquer un nom de fichier");
+    }
 
-  const file = `${__dirname}/files/${id}/${req.query.fileName}`;
-  const {width, height} = sizeOf(file)
-    return res.status(200).json({ width , height});
+    const file = `${__dirname}/files/${id}/${req.query.fileName}`;
+    const { width, height } = sizeOf(file);
+    return res.status(200).json({ width, height });
   } catch (error: any) {
-    logger.error(error)
+    logger.error(error);
     return res.status(500).send({ message: error.message });
   }
-})
+});
 
-app.get('/size', async (req, res, next) => {
+app.get("/size", async (req, res, next) => {
   try {
     const id = req.query.orgId || req.query.eventId || req.query.userId || "";
     const dirPath = `${root}/${id}`;
     const dirSize = getSize(id ? dirPath : root);
     return res.status(200).json({ current: dirSize, max: MAX_ALLOWED_SIZE });
   } catch (error: any) {
-    logger.error(error)
+    logger.error(error);
     return res.status(500).send({ message: error.message });
   }
-})
+});
 
-app.get('/view', (req, res, next) => {
-  const id = req.query.eventId || req.query.orgId || req.query.userId
+app.get("/view", (req, res, next) => {
+  const id = req.query.eventId || req.query.orgId || req.query.userId;
   if (!id) {
     return res.status(400).send("Vous devez indiquer un id");
   }
@@ -119,29 +119,31 @@ app.get('/view', (req, res, next) => {
   }
 
   const file = `${__dirname}/files/${id}/${req.query.fileName}`;
-  const r = fs.createReadStream(file)
-  const ps = new stream.PassThrough() // stream error handling
+  const r = fs.createReadStream(file);
+  const ps = new stream.PassThrough(); // stream error handling
 
   stream.pipeline(
     r,
     ps, // stream error handling
     (err) => {
       if (err) {
-        logger.info(err) // No such file or any other kind of error
+        logger.info(err); // No such file or any other kind of error
         return res.sendStatus(400);
       }
     }
-  )
+  );
 
-  ps.pipe(res)
-})
+  ps.pipe(res);
+});
 
-app.post('/', async (req, res, next) => {
-  const dirSize = await directorySize(root)
+app.post("/", async (req, res, next) => {
+  const dirSize = await directorySize(root);
   if (dirSize > MAX_ALLOWED_SIZE)
-    return res.status(400).send({ message: `Limite de ${bytesForHuman(MAX_ALLOWED_SIZE)} atteinte` });
+    return res.status(400).send({
+      message: `Limite de ${bytesForHuman(MAX_ALLOWED_SIZE)} atteinte`
+    });
 
-  const id = req.body?.eventId || req.body?.orgId || req.body?.userId
+  const id = req.body?.eventId || req.body?.orgId || req.body?.userId;
   if (!id) {
     return res.status(400).send("Vous devez indiquer un id");
   }
@@ -149,29 +151,26 @@ app.post('/', async (req, res, next) => {
   if (!req.files || Object.keys(req.files).length === 0)
     return res.status(400).send("Aucun fichier à envoyer");
 
-  const file = req.files.file
+  const file = req.files.file;
   const fsMb = file.size / (1024 * 1024);
   if (fsMb > 10) return req.status(400).send("Fichier trop volumineux");
 
-  const dirPath = `${root}/${id}`
-  mkdirp.sync(dirPath)
+  const dirPath = `${root}/${id}`;
+  mkdirp.sync(dirPath);
 
   if (file) {
-    file.mv(
-      `${dirPath}/${file.name}`,
-      function (err) {
-        if (err) {
-          return res.status(500).send(err)
-        }
-        res.json({
-          file: `${file.name}`,
-        })
-      },
-    )
+    file.mv(`${dirPath}/${file.name}`, function (err) {
+      if (err) {
+        return res.status(500).send(err);
+      }
+      res.json({
+        file: `${file.name}`
+      });
+    });
   }
-})
+});
 
-app.post('/mails', async (req, res, next) => {
+app.post("/mails", async (req, res, next) => {
   if (!req.body?.eventId) {
     res.status(400).send("Vous devez indiquer un événement");
     return;
@@ -181,19 +180,19 @@ app.post('/mails', async (req, res, next) => {
     return;
   }
 
-  let uploadDir = req.body?.eventId
-  const dir = `${root}/${uploadDir}`
-  mkdirp.sync(dir)
+  let uploadDir = req.body?.eventId;
+  const dir = `${root}/${uploadDir}`;
+  mkdirp.sync(dir);
 
   try {
-    const file = dir + "/emailList.json"
+    const file = dir + "/emailList.json";
 
     if (!fs.existsSync(file)) {
-      await fs.promises.writeFile(file, "[]", { flag: "a+" })
+      await fs.promises.writeFile(file, "[]", { flag: "a+" });
     }
 
-    const data = await fs.promises.readFile(file)
-    const json = JSON.parse(data)
+    const data = await fs.promises.readFile(file);
+    const json = JSON.parse(data);
 
     for (const { email, mail } of req.body.mails) {
       if (!json.find(({ email: e }) => e === email)) {
@@ -209,20 +208,20 @@ app.post('/mails', async (req, res, next) => {
          *   Includes recipient addresses that were temporarily rejected together with the server response
          *   response is a string returned by SMTP transports and includes the last SMTP response from the server
          */
-        json.push({ email, status: "PENDING" })
+        json.push({ email, status: "PENDING" });
       }
     }
 
-    await fs.promises.writeFile(file, JSON.stringify(json))
+    await fs.promises.writeFile(file, JSON.stringify(json));
 
-    res.json(json)
+    res.json(json);
   } catch (error) {
-    logger.error(error)
-    res.status(500).send(error)
+    logger.error(error);
+    res.status(500).send(error);
   }
-})
+});
 
-app.post('/mail', async (req, res, next) => {
+app.post("/mail", async (req, res, next) => {
   if (!req.body?.eventId) {
     res.status(400).send("Vous devez indiquer un événement");
     return;
@@ -231,22 +230,22 @@ app.post('/mail', async (req, res, next) => {
     res.status(400).send("Vous devez fournir un mail");
     return;
   }
-  const email = req.body.mail.to.replace(/<|>/g, "")
+  const email = req.body.mail.to.replace(/<|>/g, "");
   logger.info("POST /mail", req.body.eventId, email);
 
-  let uploadDir = req.body?.eventId
-  const dir = `${root}/${uploadDir}`
-  mkdirp.sync(dir)
+  let uploadDir = req.body?.eventId;
+  const dir = `${root}/${uploadDir}`;
+  mkdirp.sync(dir);
 
   try {
-    const file = dir + "/emailList.json"
+    const file = dir + "/emailList.json";
 
     if (!fs.existsSync(file)) {
-      await fs.promises.writeFile(file, "[]", { flag: "a+" })
+      await fs.promises.writeFile(file, "[]", { flag: "a+" });
     }
 
-    const data = await fs.promises.readFile(file)
-    const json = JSON.parse(data)
+    const data = await fs.promises.readFile(file);
+    const json = JSON.parse(data);
 
     if (!json.find(({ email: e }) => e === email)) {
       //const info = await transport.sendMail(req.body.mail)
@@ -260,46 +259,50 @@ app.post('/mail', async (req, res, next) => {
        *   Includes recipient addresses that were temporarily rejected together with the server response
        *   response is a string returned by SMTP transports and includes the last SMTP response from the server
        */
-      json.push({ email, status: "PENDING" })
+      json.push({ email, status: "PENDING" });
     }
 
-    await fs.promises.writeFile(file, JSON.stringify(json))
+    await fs.promises.writeFile(file, JSON.stringify(json));
 
-    res.json({ email })
+    res.json({ email });
   } catch (error) {
-    logger.error(error)
-    res.status(500).send(error)
+    logger.error(error);
+    res.status(500).send(error);
   }
-})
+});
 
-app.delete('/', async (req, res, next) => {
-  const id = req.body?.orgId || req.body?.eventId || req.body?.userId
+app.delete("/", async (req, res, next) => {
+  const id = req.body?.orgId || req.body?.eventId || req.body?.userId;
   if (!id) {
     return res.status(400).send("Vous devez indiquer un id");
   }
 
   if (!req.body?.fileName)
-    return res.status(400).send({ message: "Veuillez spécifier le nom du document à supprimer" });
+    return res
+      .status(400)
+      .send({ message: "Veuillez spécifier le nom du document à supprimer" });
 
-  const dir = `${root}/${id}`
-  const filePath = path.join(dir, req.body.fileName)
+  const dir = `${root}/${id}`;
+  const filePath = path.join(dir, req.body.fileName);
 
   if (!fs.existsSync(dir) || !fs.existsSync(filePath))
     return res.status(400).send({ message: "Document introuvable" });
 
   try {
-    await fs.promises.unlink(filePath)
-    res.json({ fileName: req.body.fileName })
+    await fs.promises.unlink(filePath);
+    res.json({ fileName: req.body.fileName });
   } catch (error) {
-    logger.error(error)
-    return res.status(500).send({ message: "Le document n'a pas pu être supprimé" });
+    logger.error(error);
+    return res
+      .status(500)
+      .send({ message: "Le document n'a pas pu être supprimé" });
   }
-})
+});
 
-app.delete('/folder', async (req, res, next) => {
-  const id = req.body?.eventId || req.body?.orgId || req.body?.userId
+app.delete("/folder", async (req, res, next) => {
+  const id = req.body?.eventId || req.body?.orgId || req.body?.userId;
   if (!id) {
-    return res.status(400).send({message: "Vous devez indiquer un id"});
+    return res.status(400).send({ message: "Vous devez indiquer un id" });
   }
 
   const dir = `${root}/${id}`;
@@ -308,18 +311,19 @@ app.delete('/folder', async (req, res, next) => {
     return res.status(200).send({ message: "Dossier introuvable" });
 
   try {
-    await fs.promises.rm(dir, { recursive: true, force: true })
-    res.json({ dirName: id })
+    await fs.promises.rm(dir, { recursive: true, force: true });
+    res.json({ dirName: id });
   } catch (error) {
-    logger.error(error)
-    return res.status(500).send({ message: "Le dossier n'a pas pu être supprimé" });
+    logger.error(error);
+    return res
+      .status(500)
+      .send({ message: "Le dossier n'a pas pu être supprimé" });
   }
-})
+});
 
 app.listen(PORT, () => {
-  logger.info(`Listening at http://localhost:${PORT} ; root=${root}`)
-})
-
+  logger.info(`Listening at http://localhost:${PORT} ; root=${root}`);
+});
 
 // const nodemailerSendgrid = require('nodemailer-sendgrid')
 // const EMAIL_API_KEY = "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"

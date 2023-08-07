@@ -53,29 +53,29 @@
         "use strict";
         Object.defineProperty(exports, "__esModule", { value: true });
         image_size_1 = __importDefault(image_size_1);
-        const fs = require('fs');
-        const glob = require('glob');
-        const mkdirp = require('mkdirp');
-        const path = require('path');
-        const stream = require('stream');
-        const express = require('express');
-        const pino = require('pino');
-        const expressPino = require('express-pino-logger');
-        const cors = require('cors');
-        const fu = require('express-fileupload');
+        const fs = require("fs");
+        const glob = require("glob");
+        const mkdirp = require("mkdirp");
+        const path = require("path");
+        const stream = require("stream");
+        const express = require("express");
+        const pino = require("pino");
+        const expressPino = require("express-pino-logger");
+        const cors = require("cors");
+        const fu = require("express-fileupload");
         const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
         const PORT = 3000;
-        const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+        const logger = pino({ level: process.env.LOG_LEVEL || "info" });
         const root = `${__dirname}/files`;
         mkdirp.sync(root);
         const app = express();
         app.use(expressPino({ logger }));
         app.use(cors());
-        app.use(express.json({ limit: '25mb' }));
+        app.use(express.json({ limit: "25mb" }));
         //app.use(express.urlencoded({limit: '25mb'}));
         app.use(fu());
         // app.use('/', express.static("files"))
-        app.get('/', (req, res, next) => {
+        app.get("/", function getDocuments(req, res, next) {
             const id = req.query.eventId || req.query.orgId || req.query.userId;
             if (!id) {
                 return res.status(400).send("Vous devez indiquer un id");
@@ -84,7 +84,7 @@
             glob(dir + "/*", {}, (err, files) => {
                 if (err)
                     throw err;
-                files = files.map(file => path.relative(dir, file));
+                files = files.map((file) => path.relative(dir, file));
                 res.send(files);
             });
             /*
@@ -101,10 +101,10 @@
             });
             */
         });
-        app.get('/check', (req, res, next) => {
+        app.get("/check", (req, res, next) => {
             res.status(200).send("check");
         });
-        app.get('/download', (req, res, next) => {
+        app.get("/download", (req, res, next) => {
             const id = req.query.eventId || req.query.orgId || req.query.userId;
             if (!id) {
                 return res.status(400).send("Vous devez indiquer un id");
@@ -116,7 +116,7 @@
             const file = `${dirPath}/${req.query.fileName}`;
             res.download(file);
         });
-        app.get('/dimensions', async (req, res, next) => {
+        app.get("/dimensions", async (req, res, next) => {
             try {
                 const id = req.query.eventId || req.query.orgId || req.query.userId;
                 if (!id) {
@@ -134,7 +134,7 @@
                 return res.status(500).send({ message: error.message });
             }
         });
-        app.get('/size', async (req, res, next) => {
+        app.get("/size", async (req, res, next) => {
             try {
                 const id = req.query.orgId || req.query.eventId || req.query.userId || "";
                 const dirPath = `${root}/${id}`;
@@ -146,7 +146,7 @@
                 return res.status(500).send({ message: error.message });
             }
         });
-        app.get('/view', (req, res, next) => {
+        app.get("/view", (req, res, next) => {
             const id = req.query.eventId || req.query.orgId || req.query.userId;
             if (!id) {
                 return res.status(400).send("Vous devez indiquer un id");
@@ -166,10 +166,12 @@
             });
             ps.pipe(res);
         });
-        app.post('/', async (req, res, next) => {
+        app.post("/", async (req, res, next) => {
             const dirSize = await (0, utils_1.directorySize)(root);
             if (dirSize > MAX_ALLOWED_SIZE)
-                return res.status(400).send({ message: `Limite de ${(0, utils_1.bytesForHuman)(MAX_ALLOWED_SIZE)} atteinte` });
+                return res.status(400).send({
+                    message: `Limite de ${(0, utils_1.bytesForHuman)(MAX_ALLOWED_SIZE)} atteinte`
+                });
             const id = req.body?.eventId || req.body?.orgId || req.body?.userId;
             if (!id) {
                 return res.status(400).send("Vous devez indiquer un id");
@@ -188,12 +190,12 @@
                         return res.status(500).send(err);
                     }
                     res.json({
-                        file: `${file.name}`,
+                        file: `${file.name}`
                     });
                 });
             }
         });
-        app.post('/mails', async (req, res, next) => {
+        app.post("/mails", async (req, res, next) => {
             if (!req.body?.eventId) {
                 res.status(400).send("Vous devez indiquer un événement");
                 return;
@@ -237,7 +239,7 @@
                 res.status(500).send(error);
             }
         });
-        app.post('/mail', async (req, res, next) => {
+        app.post("/mail", async (req, res, next) => {
             if (!req.body?.eventId) {
                 res.status(400).send("Vous devez indiquer un événement");
                 return;
@@ -280,13 +282,15 @@
                 res.status(500).send(error);
             }
         });
-        app.delete('/', async (req, res, next) => {
+        app.delete("/", async (req, res, next) => {
             const id = req.body?.orgId || req.body?.eventId || req.body?.userId;
             if (!id) {
                 return res.status(400).send("Vous devez indiquer un id");
             }
             if (!req.body?.fileName)
-                return res.status(400).send({ message: "Veuillez spécifier le nom du document à supprimer" });
+                return res
+                    .status(400)
+                    .send({ message: "Veuillez spécifier le nom du document à supprimer" });
             const dir = `${root}/${id}`;
             const filePath = path.join(dir, req.body.fileName);
             if (!fs.existsSync(dir) || !fs.existsSync(filePath))
@@ -297,10 +301,12 @@
             }
             catch (error) {
                 logger.error(error);
-                return res.status(500).send({ message: "Le document n'a pas pu être supprimé" });
+                return res
+                    .status(500)
+                    .send({ message: "Le document n'a pas pu être supprimé" });
             }
         });
-        app.delete('/folder', async (req, res, next) => {
+        app.delete("/folder", async (req, res, next) => {
             const id = req.body?.eventId || req.body?.orgId || req.body?.userId;
             if (!id) {
                 return res.status(400).send({ message: "Vous devez indiquer un id" });
@@ -314,7 +320,9 @@
             }
             catch (error) {
                 logger.error(error);
-                return res.status(500).send({ message: "Le dossier n'a pas pu être supprimé" });
+                return res
+                    .status(500)
+                    .send({ message: "Le dossier n'a pas pu être supprimé" });
             }
         });
         app.listen(PORT, () => {
