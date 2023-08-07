@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "outFile": "app.js",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "esnext",
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "baseUrl": "."
+  },
+  "include": [
+    "**/*.ts",
+  ]
+}
