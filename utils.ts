@@ -1,6 +1,6 @@
-import { readdir, stat } from 'fs/promises';
-import fs from "fs"
-import path from "path"
+import { readdir, stat } from "fs/promises";
+import fs from "fs";
+import path from "path";
 
 export function bytesForHuman(bytes, decimals = 0) {
   const units = ["o", "Ko", "Mo", "Go"];
@@ -15,9 +15,12 @@ export function bytesForHuman(bytes, decimals = 0) {
 
 export async function directorySize(directory) {
   const files = await readdir(directory);
-  const stats = files.map(file => stat(path.join(directory, file)));
+  const stats = files.map((file) => stat(path.join(directory, file)));
 
-  return (await Promise.all(stats)).reduce((accumulator, { size }) => accumulator + size, 0);
+  return (await Promise.all(stats)).reduce(
+    (accumulator, { size }) => accumulator + size,
+    0
+  );
 }
 
 export function getSize(path) {
@@ -25,12 +28,22 @@ export function getSize(path) {
   let size = 0;
   if (fs.statSync(path).isDirectory()) {
     const files = fs.readdirSync(path);
-    files.forEach(file => {
+    files.forEach((file) => {
       size += getSize(path + "/" + file);
     });
-  }
-  else {
+  } else {
     size += fs.statSync(path).size;
   }
   return size;
+}
+
+export function isImage(fileName: string) {
+  const str = fileName.toLowerCase();
+  return (
+    str.includes(".png") ||
+    str.includes(".jpg") ||
+    str.includes(".jpeg") ||
+    str.includes(".bmp") ||
+    str.includes(".webp")
+  );
 }

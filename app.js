@@ -12,10 +12,14 @@
     var __importDefault = (this && this.__importDefault) || function (mod) {
         return (mod && mod.__esModule) ? mod : { "default": mod };
     };
+    define("types", ["require", "exports"], function (require, exports) {
+        "use strict";
+        Object.defineProperty(exports, "__esModule", { value: true });
+    });
     define("utils", ["require", "exports", "fs/promises", "fs", "path"], function (require, exports, promises_1, fs_1, path_1) {
         "use strict";
         Object.defineProperty(exports, "__esModule", { value: true });
-        exports.getSize = exports.directorySize = exports.bytesForHuman = void 0;
+        exports.isImage = exports.getSize = exports.directorySize = exports.bytesForHuman = void 0;
         fs_1 = __importDefault(fs_1);
         path_1 = __importDefault(path_1);
         function bytesForHuman(bytes, decimals = 0) {
@@ -29,7 +33,7 @@
         exports.bytesForHuman = bytesForHuman;
         async function directorySize(directory) {
             const files = await (0, promises_1.readdir)(directory);
-            const stats = files.map(file => (0, promises_1.stat)(path_1.default.join(directory, file)));
+            const stats = files.map((file) => (0, promises_1.stat)(path_1.default.join(directory, file)));
             return (await Promise.all(stats)).reduce((accumulator, { size }) => accumulator + size, 0);
         }
         exports.directorySize = directorySize;
@@ -38,7 +42,7 @@
             let size = 0;
             if (fs_1.default.statSync(path).isDirectory()) {
                 const files = fs_1.default.readdirSync(path);
-                files.forEach(file => {
+                files.forEach((file) => {
                     size += getSize(path + "/" + file);
                 });
             }
@@ -48,58 +52,82 @@
             return size;
         }
         exports.getSize = getSize;
+        function isImage(fileName) {
+            const str = fileName.toLowerCase();
+            return (str.includes(".png") ||
+                str.includes(".jpg") ||
+                str.includes(".jpeg") ||
+                str.includes(".bmp") ||
+                str.includes(".webp"));
+        }
+        exports.isImage = isImage;
     });
-    define("app", ["require", "exports", "image-size", "utils"], function (require, exports, image_size_1, utils_1) {
+    define("app", ["require", "exports", "cors", "express", "express-fileupload", "express-pino-logger", "fs", "glob", "image-size", "mkdirp", "path", "pino", "stream", "utils"], function (require, exports, cors_1, express_1, express_fileupload_1, express_pino_logger_1, fs_2, glob_1, image_size_1, mkdirp_1, path_2, pino_1, stream_1, utils_1) {
         "use strict";
         Object.defineProperty(exports, "__esModule", { value: true });
+        cors_1 = __importDefault(cors_1);
+        express_1 = __importDefault(express_1);
+        express_fileupload_1 = __importDefault(express_fileupload_1);
+        express_pino_logger_1 = __importDefault(express_pino_logger_1);
+        fs_2 = __importDefault(fs_2);
+        glob_1 = __importDefault(glob_1);
         image_size_1 = __importDefault(image_size_1);
-        const fs = require("fs");
-        const glob = require("glob");
-        const mkdirp = require("mkdirp");
-        const path = require("path");
-        const stream = require("stream");
-        const express = require("express");
-        const pino = require("pino");
-        const expressPino = require("express-pino-logger");
-        const cors = require("cors");
-        const fu = require("express-fileupload");
+        mkdirp_1 = __importDefault(mkdirp_1);
+        path_2 = __importDefault(path_2);
+        pino_1 = __importDefault(pino_1);
+        stream_1 = __importDefault(stream_1);
+        //#region constants
         const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
-        const PORT = 3000;
-        const logger = pino({ level: process.env.LOG_LEVEL || "info" });
-        const root = `${__dirname}/files`;
-        mkdirp.sync(root);
-        const app = express();
-        app.use(expressPino({ logger }));
-        app.use(cors());
-        app.use(express.json({ limit: "25mb" }));
+        const PORT = 3001;
+        //#endregion
+        //#region bootstrap
+        const app = (0, express_1.default)();
+        const logger = (0, pino_1.default)({ level: process.env.LOG_LEVEL || "info" });
+        const root = `../lbf/public/files`;
+        mkdirp_1.default.sync(root);
+        app.use((0, express_pino_logger_1.default)({ logger }));
+        app.use((0, cors_1.default)());
+        app.use(express_1.default.json({ limit: "25mb" }));
         //app.use(express.urlencoded({limit: '25mb'}));
-        app.use(fu());
+        app.use((0, express_fileupload_1.default)());
         // app.use('/', express.static("files"))
+        //#endregion
         app.get("/", function getDocuments(req, res, next) {
             const id = req.query.eventId || req.query.orgId || req.query.userId;
             if (!id) {
                 return res.status(400).send("Vous devez indiquer un id");
             }
             const dir = `${root}/${id}`;
-            glob(dir + "/*", {}, (err, files) => {
+            (0, glob_1.default)(dir + "/*", {}, (err, filePaths) => {
                 if (err)
                     throw err;
-                files = files.map((file) => path.relative(dir, file));
-                res.send(files);
+                res.send(filePaths.map((filePath) => {
+                    const bytes = (0, utils_1.getSize)(filePath);
+                    const url = path_2.default.relative(dir, filePath);
+                    if ((0, utils_1.isImage)(url))
+                        return {
+                            url,
+                            bytes,
+                            ...(0, image_size_1.default)(filePath)
+                        };
+                    return { url, bytes };
+                }));
             });
-            /*
-            const files = []
-            const walker  = walk.walk('./files', { followLinks: false });
-          
-            walker.on('file', function(root, stat, next) {
-              if (root.includes(req.query.orgId)) files.push(stat.name);
-              next();
-            });
-          
-            walker.on('end', function() {
-              res.send(files);
-            });
-            */
+            {
+                /*
+                  const files = []
+                  const walker  = walk.walk('./files', { followLinks: false });
+            
+                  walker.on('file', function(root, stat, next) {
+                    if (root.includes(req.query.orgId)) files.push(stat.name);
+                    next();
+                  });
+            
+                  walker.on('end', function() {
+                    res.send(files);
+                  });
+                */
+            }
         });
         app.get("/check", (req, res, next) => {
             res.status(200).send("check");
@@ -155,9 +183,9 @@
                 return res.status(400).send("Vous devez indiquer un nom de fichier");
             }
             const file = `${__dirname}/files/${id}/${req.query.fileName}`;
-            const r = fs.createReadStream(file);
-            const ps = new stream.PassThrough(); // stream error handling
-            stream.pipeline(r, ps, // stream error handling
+            const r = fs_2.default.createReadStream(file);
+            const ps = new stream_1.default.PassThrough(); // stream error handling
+            stream_1.default.pipeline(r, ps, // stream error handling
             (err) => {
                 if (err) {
                     logger.info(err); // No such file or any other kind of error
@@ -176,14 +204,16 @@
             if (!id) {
                 return res.status(400).send("Vous devez indiquer un id");
             }
-            if (!req.files || Object.keys(req.files).length === 0)
+            if (!req.files || Object.keys(req.files).length === 0) {
                 return res.status(400).send("Aucun fichier à envoyer");
+            }
             const file = req.files.file;
             const fsMb = file.size / (1024 * 1024);
-            if (fsMb > 10)
-                return req.status(400).send("Fichier trop volumineux");
+            if (fsMb > 10) {
+                return res.status(400).send("Fichier trop volumineux");
+            }
             const dirPath = `${root}/${id}`;
-            mkdirp.sync(dirPath);
+            mkdirp_1.default.sync(dirPath);
             if (file) {
                 file.mv(`${dirPath}/${file.name}`, function (err) {
                     if (err) {
@@ -206,14 +236,14 @@
             }
             let uploadDir = req.body?.eventId;
             const dir = `${root}/${uploadDir}`;
-            mkdirp.sync(dir);
+            mkdirp_1.default.sync(dir);
             try {
                 const file = dir + "/emailList.json";
-                if (!fs.existsSync(file)) {
-                    await fs.promises.writeFile(file, "[]", { flag: "a+" });
+                if (!fs_2.default.existsSync(file)) {
+                    await fs_2.default.promises.writeFile(file, "[]", { flag: "a+" });
                 }
-                const data = await fs.promises.readFile(file);
-                const json = JSON.parse(data);
+                const data = await fs_2.default.promises.readFile(file);
+                const json = JSON.parse(data.toString());
                 for (const { email, mail } of req.body.mails) {
                     if (!json.find(({ email: e }) => e === email)) {
                         logger.info("sent mail to", email);
@@ -231,7 +261,7 @@
                         json.push({ email, status: "PENDING" });
                     }
                 }
-                await fs.promises.writeFile(file, JSON.stringify(json));
+                await fs_2.default.promises.writeFile(file, JSON.stringify(json));
                 res.json(json);
             }
             catch (error) {
@@ -252,14 +282,14 @@
             logger.info("POST /mail", req.body.eventId, email);
             let uploadDir = req.body?.eventId;
             const dir = `${root}/${uploadDir}`;
-            mkdirp.sync(dir);
+            mkdirp_1.default.sync(dir);
             try {
                 const file = dir + "/emailList.json";
-                if (!fs.existsSync(file)) {
-                    await fs.promises.writeFile(file, "[]", { flag: "a+" });
+                if (!fs_2.default.existsSync(file)) {
+                    await fs_2.default.promises.writeFile(file, "[]", { flag: "a+" });
                 }
-                const data = await fs.promises.readFile(file);
-                const json = JSON.parse(data);
+                const data = await fs_2.default.promises.readFile(file);
+                const json = JSON.parse(data.toString());
                 if (!json.find(({ email: e }) => e === email)) {
                     //const info = await transport.sendMail(req.body.mail)
                     /*
@@ -274,7 +304,7 @@
                      */
                     json.push({ email, status: "PENDING" });
                 }
-                await fs.promises.writeFile(file, JSON.stringify(json));
+                await fs_2.default.promises.writeFile(file, JSON.stringify(json));
                 res.json({ email });
             }
             catch (error) {
@@ -292,11 +322,11 @@
                     .status(400)
                     .send({ message: "Veuillez spécifier le nom du document à supprimer" });
             const dir = `${root}/${id}`;
-            const filePath = path.join(dir, req.body.fileName);
-            if (!fs.existsSync(dir) || !fs.existsSync(filePath))
+            const filePath = path_2.default.join(dir, req.body.fileName);
+            if (!fs_2.default.existsSync(dir) || !fs_2.default.existsSync(filePath))
                 return res.status(400).send({ message: "Document introuvable" });
             try {
-                await fs.promises.unlink(filePath);
+                await fs_2.default.promises.unlink(filePath);
                 res.json({ fileName: req.body.fileName });
             }
             catch (error) {
@@ -312,10 +342,10 @@
                 return res.status(400).send({ message: "Vous devez indiquer un id" });
             }
             const dir = `${root}/${id}`;
-            if (!fs.existsSync(dir))
+            if (!fs_2.default.existsSync(dir))
                 return res.status(200).send({ message: "Dossier introuvable" });
             try {
-                await fs.promises.rm(dir, { recursive: true, force: true });
+                await fs_2.default.promises.rm(dir, { recursive: true, force: true });
                 res.json({ dirName: id });
             }
             catch (error) {
@@ -328,14 +358,18 @@
         app.listen(PORT, () => {
             logger.info(`Listening at http://localhost:${PORT} ; root=${root}`);
         });
+        {
+            /*
+              const nodemailerSendgrid = require('nodemailer-sendgrid')
+              const EMAIL_API_KEY = "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"
+              const transport = nodemailer.createTransport(
+                nodemailerSendgrid({
+                  apiKey: EMAIL_API_KEY
+                })
+              );
+            */
+        }
     });
-    // const nodemailerSendgrid = require('nodemailer-sendgrid')
-    // const EMAIL_API_KEY = "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"
-    // const transport = nodemailer.createTransport(
-    //   nodemailerSendgrid({
-    //     apiKey: EMAIL_API_KEY
-    //   })
-    // );
     
     'marker:resolver';
 

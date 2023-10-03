@@ -1,60 +1,75 @@
-const fs = require("fs");
-const glob = require("glob");
-const mkdirp = require("mkdirp");
-const path = require("path");
-const stream = require("stream");
-
-const express = require("express");
-const pino = require("pino");
-const expressPino = require("express-pino-logger");
-const cors = require("cors");
-const fu = require("express-fileupload");
-
+import cors from "cors";
+import express from "express";
+import fu, { UploadedFile } from "express-fileupload";
+import expressPino from "express-pino-logger";
+import fs from "fs";
+import glob from "glob";
 import sizeOf from "image-size";
-import { bytesForHuman, directorySize, getSize } from "./utils";
+import mkdirp from "mkdirp";
+import path from "path";
+import pino from "pino";
+import stream from "stream";
+import { TypedRequestBody } from "./types";
+import { bytesForHuman, directorySize, getSize, isImage } from "./utils";
 
+//#region constants
 const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
-const PORT = 3000;
+const PORT = 3001;
+//#endregion
 
-const logger = pino({ level: process.env.LOG_LEVEL || "info" });
-const root = `${__dirname}/files`;
-mkdirp.sync(root);
-
+//#region bootstrap
 const app = express();
+const logger = pino({ level: process.env.LOG_LEVEL || "info" });
+const root = `../lbf/public/files`;
+mkdirp.sync(root);
 app.use(expressPino({ logger }));
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
 //app.use(express.urlencoded({limit: '25mb'}));
 app.use(fu());
 // app.use('/', express.static("files"))
+//#endregion
 
 app.get("/", function getDocuments(req, res, next) {
   const id = req.query.eventId || req.query.orgId || req.query.userId;
   if (!id) {
     return res.status(400).send("Vous devez indiquer un id");
   }
-
   const dir = `${root}/${id}`;
-
-  glob(dir + "/*", {}, (err, files) => {
+  glob(dir + "/*", {}, (err, filePaths) => {
     if (err) throw err;
-    files = files.map((file) => path.relative(dir, file));
-    res.send(files);
+    res.send(
+      filePaths.map((filePath) => {
+        const bytes = getSize(filePath);
+        const url = path.relative(dir, filePath);
+
+        if (isImage(url))
+          return {
+            url,
+            bytes,
+            ...sizeOf(filePath)
+          };
+
+        return { url, bytes };
+      })
+    );
   });
 
-  /*   
-  const files = []
-  const walker  = walk.walk('./files', { followLinks: false });
+  {
+    /*
+      const files = []
+      const walker  = walk.walk('./files', { followLinks: false });
 
-  walker.on('file', function(root, stat, next) {
-    if (root.includes(req.query.orgId)) files.push(stat.name);
-    next();
-  });
+      walker.on('file', function(root, stat, next) {
+        if (root.includes(req.query.orgId)) files.push(stat.name);
+        next();
+      });
 
-  walker.on('end', function() {
-    res.send(files);
-  });
-  */
+      walker.on('end', function() {
+        res.send(files);
+      });
+    */
+  }
 });
 
 app.get("/check", (req, res, next) => {
@@ -136,39 +151,48 @@ app.get("/view", (req, res, next) => {
   ps.pipe(res);
 });
 
-app.post("/", async (req, res, next) => {
-  const dirSize = await directorySize(root);
-  if (dirSize > MAX_ALLOWED_SIZE)
-    return res.status(400).send({
-      message: `Limite de ${bytesForHuman(MAX_ALLOWED_SIZE)} atteinte`
-    });
-
-  const id = req.body?.eventId || req.body?.orgId || req.body?.userId;
-  if (!id) {
-    return res.status(400).send("Vous devez indiquer un id");
-  }
-
-  if (!req.files || Object.keys(req.files).length === 0)
-    return res.status(400).send("Aucun fichier à envoyer");
-
-  const file = req.files.file;
-  const fsMb = file.size / (1024 * 1024);
-  if (fsMb > 10) return req.status(400).send("Fichier trop volumineux");
-
-  const dirPath = `${root}/${id}`;
-  mkdirp.sync(dirPath);
-
-  if (file) {
-    file.mv(`${dirPath}/${file.name}`, function (err) {
-      if (err) {
-        return res.status(500).send(err);
-      }
-      res.json({
-        file: `${file.name}`
+app.post(
+  "/",
+  async (
+    req: TypedRequestBody<{
+      eventId?: string;
+      orgId?: string;
+      userId?: string;
+    }>,
+    res,
+    next
+  ) => {
+    const dirSize = await directorySize(root);
+    if (dirSize > MAX_ALLOWED_SIZE)
+      return res.status(400).send({
+        message: `Limite de ${bytesForHuman(MAX_ALLOWED_SIZE)} atteinte`
       });
-    });
+    const id = req.body?.eventId || req.body?.orgId || req.body?.userId;
+    if (!id) {
+      return res.status(400).send("Vous devez indiquer un id");
+    }
+    if (!req.files || Object.keys(req.files).length === 0) {
+      return res.status(400).send("Aucun fichier à envoyer");
+    }
+    const file = req.files.file as UploadedFile;
+    const fsMb = file.size / (1024 * 1024);
+    if (fsMb > 10) {
+      return res.status(400).send("Fichier trop volumineux");
+    }
+    const dirPath = `${root}/${id}`;
+    mkdirp.sync(dirPath);
+    if (file) {
+      file.mv(`${dirPath}/${file.name}`, function (err) {
+        if (err) {
+          return res.status(500).send(err);
+        }
+        res.json({
+          file: `${file.name}`
+        });
+      });
+    }
   }
-});
+);
 
 app.post("/mails", async (req, res, next) => {
   if (!req.body?.eventId) {
@@ -192,7 +216,7 @@ app.post("/mails", async (req, res, next) => {
     }
 
     const data = await fs.promises.readFile(file);
-    const json = JSON.parse(data);
+    const json = JSON.parse(data.toString());
 
     for (const { email, mail } of req.body.mails) {
       if (!json.find(({ email: e }) => e === email)) {
@@ -245,7 +269,7 @@ app.post("/mail", async (req, res, next) => {
     }
 
     const data = await fs.promises.readFile(file);
-    const json = JSON.parse(data);
+    const json = JSON.parse(data.toString());
 
     if (!json.find(({ email: e }) => e === email)) {
       //const info = await transport.sendMail(req.body.mail)
@@ -325,10 +349,14 @@ app.listen(PORT, () => {
   logger.info(`Listening at http://localhost:${PORT} ; root=${root}`);
 });
 
-// const nodemailerSendgrid = require('nodemailer-sendgrid')
-// const EMAIL_API_KEY = "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"
-// const transport = nodemailer.createTransport(
-//   nodemailerSendgrid({
-//     apiKey: EMAIL_API_KEY
-//   })
-// );
+{
+  /* 
+    const nodemailerSendgrid = require('nodemailer-sendgrid')
+    const EMAIL_API_KEY = "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"
+    const transport = nodemailer.createTransport(
+      nodemailerSendgrid({
+        apiKey: EMAIL_API_KEY
+      })
+    );
+  */
+}
