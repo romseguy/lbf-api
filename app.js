@@ -83,7 +83,7 @@
         //#region bootstrap
         const app = (0, express_1.default)();
         const logger = (0, pino_1.default)({ level: process.env.LOG_LEVEL || "info" });
-        const root = `../lbf/public/files`;
+        const root = `/var/www/public/files`;
         mkdirp_1.default.sync(root);
         app.use((0, express_pino_logger_1.default)({ logger }));
         app.use((0, cors_1.default)());

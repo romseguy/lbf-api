@@ -20,7 +20,7 @@ const PORT = 3001;
 //#region bootstrap
 const app = express();
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
-const root = `../lbf/public/files`;
+const root = `./files`;
 mkdirp.sync(root);
 app.use(expressPino({ logger }));
 app.use(cors());
