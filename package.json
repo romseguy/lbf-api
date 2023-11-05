@@ -13,11 +13,11 @@
     "express-pino-logger": "^7.0.0",
     "glob": "^7.2.0",
     "https": "^1.0.0",
-    "image-size": "^1.0.2",
     "mkdirp": "^1.0.4",
     "nodemailer": "^6.6.5",
     "pino": "^8.14.1",
     "pino-pretty": "^10.0.0",
+    "probe-image-size": "^7.2.3",
     "tsm": "^2.3.0",
     "walk": "^2.3.15"
   },

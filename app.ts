@@ -4,7 +4,8 @@ import fu, { UploadedFile } from "express-fileupload";
 import expressPino from "express-pino-logger";
 import fs from "fs";
 import glob from "glob";
-import sizeOf from "image-size";
+//import sizeOf from "image-size";
+import sizeOf from "probe-image-size";
 import mkdirp from "mkdirp";
 import path from "path";
 import pino from "pino";
@@ -20,7 +21,7 @@ const PORT = 3001;
 //#region bootstrap
 const app = express();
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
-const root = `./files`;
+const root = `/var/www/public/files`;
 mkdirp.sync(root);
 app.use(expressPino({ logger }));
 app.use(cors());
@@ -43,12 +44,14 @@ app.get("/", function getDocuments(req, res, next) {
         const bytes = getSize(filePath);
         const url = path.relative(dir, filePath);
 
-        if (isImage(url))
+        if (isImage(url)) {
+          const result = sizeOf.sync(fs.readFileSync(filePath));
           return {
             url,
             bytes,
-            ...sizeOf(filePath)
+            ...result
           };
+        }
 
         return { url, bytes };
       })
@@ -103,7 +106,7 @@ app.get("/dimensions", async (req, res, next) => {
     }
 
     const file = `${__dirname}/files/${id}/${req.query.fileName}`;
-    const { width, height } = sizeOf(file);
+    const { width, height } = sizeOf.sync(fs.readFileSync(file));
     return res.status(200).json({ width, height });
   } catch (error: any) {
     logger.error(error);
