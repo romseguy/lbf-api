@@ -12,6 +12,8 @@ import pino from "pino";
 import stream from "stream";
 import { TypedRequestBody } from "./types";
 import { bytesForHuman, directorySize, getSize, isImage } from "./utils";
+import dotenv from "dotenv";
+dotenv.config();
 
 //#region constants
 const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
@@ -21,7 +23,7 @@ const PORT = 3001;
 //#region bootstrap
 const app = express();
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
-const root = `/var/www/public/files`;
+const root = process.env.ROOT;
 mkdirp.sync(root);
 app.use(expressPino({ logger }));
 app.use(cors());
