@@ -15,6 +15,13 @@ import { bytesForHuman, directorySize, getSize, isImage } from "./utils";
 import dotenv from "dotenv";
 dotenv.config();
 
+import { URL } from "url";
+
+//@ts-ignore
+const __filename = new URL("", import.meta.url).pathname;
+//@ts-ignore
+const __dirname = new URL(".", import.meta.url).pathname;
+
 //#region constants
 const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
 const PORT = 3001;
@@ -29,21 +36,29 @@ app.use(expressPino({ logger }));
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
 //app.use(express.urlencoded({limit: '25mb'}));
-app.use(fu());
+app.use(
+  fu({
+    defCharset: "utf8",
+    defParamCharset: "utf8"
+  })
+);
 // app.use('/', express.static("files"))
 //#endregion
 
 app.get("/", function getDocuments(req, res, next) {
   const id = req.query.eventId || req.query.orgId || req.query.userId;
+
   if (!id) {
     return res.status(400).send("Vous devez indiquer un id");
   }
   const dir = `${root}/${id}`;
+
   glob(dir + "/*", {}, (err, filePaths) => {
     if (err) throw err;
     res.send(
       filePaths.map((filePath) => {
         const bytes = getSize(filePath);
+        const time = fs.statSync(filePath).mtime.getTime();
         const url = path.relative(dir, filePath);
 
         if (isImage(url)) {
@@ -55,7 +70,7 @@ app.get("/", function getDocuments(req, res, next) {
           };
         }
 
-        return { url, bytes };
+        return { url, time, bytes };
       })
     );
   });
