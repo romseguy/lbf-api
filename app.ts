@@ -15,6 +15,11 @@ import { bytesForHuman, directorySize, getSize, isImage } from "./utils";
 import dotenv from "dotenv";
 dotenv.config();
 
+import { URL } from "url";
+
+const __filename = new URL("", import.meta.url).pathname;
+const __dirname = new URL(".", import.meta.url).pathname;
+
 //#region constants
 const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
 const PORT = 3001;
