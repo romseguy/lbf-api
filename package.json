@@ -4,11 +4,12 @@
   "main": "app.js",
   "license": "MIT",
   "scripts": {
-    "start": "tsm app.ts | pino-pretty"
+    "dev": "NODE_ENV=development tsm app.ts | pino-pretty",
+    "start": "NODE_ENV=production tsm app.ts | pino-pretty"
   },
   "dependencies": {
+    "@dotenvx/dotenvx": "^1.7.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
     "express": "^4.17.1",
     "express-fileupload": "^1.2.1",
     "express-pino-logger": "^7.0.0",
@@ -28,6 +29,7 @@
     "@types/express-fileupload": "^1.4.2",
     "@types/glob": "^8.1.0",
     "@types/node": "^20.8.6",
+    "@types/nodemailer": "^6.4.15",
     "typescript": "^5.0.4"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"

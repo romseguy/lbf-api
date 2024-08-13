@@ -37,6 +37,27 @@ export function getSize(path) {
   return size;
 }
 
+export const getRefId = (
+  entity?: string | Record<string, any> | null,
+  key?: string
+) => {
+  if (!entity) return "";
+
+  if (typeof entity === "string") return entity;
+
+  if (typeof entity === "object") {
+    const value = entity[key || "createdBy"];
+
+    if (value) {
+      if (typeof value === "string") return value;
+
+      if (typeof value === "object") return value._id;
+    }
+  }
+
+  return "";
+};
+
 export function isImage(fileName: string) {
   const str = fileName.toLowerCase();
   return (
@@ -47,3 +68,15 @@ export function isImage(fileName: string) {
     str.includes(".webp")
   );
 }
+
+export function logJson(message: string, object?: any) {
+  if (object) console.log(message, JSON.stringify(object, null, 2));
+  else console.log(message);
+}
+
+export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const toHours = (ms) => toSeconds(ms) / 3600;
+export const toMinutes = (ms) => toSeconds(ms) / 60;
+export const toSeconds = (ms) => ms / 1000;
+export const hoursToSeconds = (hours) => hours * 3600;

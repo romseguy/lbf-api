@@ -7,24 +7,45 @@ import glob from "glob";
 //import sizeOf from "image-size";
 import sizeOf from "probe-image-size";
 import mkdirp from "mkdirp";
+import nodemailer from "nodemailer";
 import path from "path";
 import pino from "pino";
 import stream from "stream";
 import { TypedRequestBody, TypedRequestQuery } from "./types";
-import { bytesForHuman, directorySize, getSize, isImage } from "./utils";
-import dotenv from "dotenv";
+import {
+  bytesForHuman,
+  directorySize,
+  getSize,
+  isImage,
+  sleep,
+  toHours
+} from "./utils";
+import dotenv from "@dotenvx/dotenvx";
 dotenv.config();
 
 import { URL } from "url";
+import { ServerEventTypes, getEvent, logEvent } from "./logging";
 
+//#region constants
 //@ts-ignore
 const __filename = new URL("", import.meta.url).pathname;
 //@ts-ignore
 const __dirname = new URL(".", import.meta.url).pathname;
-
-//#region constants
+const __pdirname = path.resolve(__dirname, "..");
 const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
 const PORT = 3002;
+const SECOND = 1000;
+const HOUR = 3600 * SECOND;
+const SERVER = {
+  pool: true,
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  secure: false, // use TLS
+  auth: {
+    user: "rom.seguy@lilo.org",
+    pass: process.env.EMAIL_API_KEY
+  }
+};
 //#endregion
 
 //#region bootstrap
@@ -378,10 +399,178 @@ app.delete(
   }
 );
 
-app.listen(PORT, () => {
+async function daily() {
+  const prefix = `🚀 ~ ${new Date().toLocaleString()} ~ DAILY `;
+  console.log(prefix);
+
+  const day = 24;
+
+  const last = await getEvent(
+    ({ type, metadata }) =>
+      type === ServerEventTypes.API_CALL && metadata.endpoint === "/daily"
+  );
+
+  if (!last) await sendDailyMail();
+  else {
+    const lastT = last.timestamp;
+    const hours = (Date.now() - lastT) / 1000 / 3600;
+    console.log(prefix + hours + " hours since last sent mail");
+    if (hours < day) {
+      console.log(prefix + "abort");
+      return;
+    }
+    await sendDailyMail();
+  }
+
+  async function sendDailyMail() {
+    const dataPath =
+      __pdirname +
+      `/${
+        process.env.NODE_ENV === "production" ? "ateliers" : "lbf"
+      }/logs/events.json`;
+    const data = await fs.promises.readFile(dataPath);
+    const json = JSON.parse(data.toString());
+    console.log(prefix + dataPath + " " + json);
+
+    let topics = [],
+      topicMessages = [],
+      galleries = [],
+      documents = [];
+
+    for (const event of json) {
+      const diff = Date.now() - event.timestamp;
+
+      // console.log(
+      //   `🚀 ~ event happened ${toSeconds(diff)} seconds ago ${toMinutes(
+      //     diff
+      //   )} minutes ago ${toHours(diff)} hours ago`
+      // );
+
+      if (toHours(diff) < day) {
+        if (event.type === ServerEventTypes.TOPICS) {
+          topics.push(event);
+        } else if (event.type === ServerEventTypes.TOPICS_MESSAGE) {
+          topicMessages.push(event);
+        } else if (event.type === ServerEventTypes.GALLERIES) {
+          galleries.push(event);
+        } else if (event.type === ServerEventTypes.DOCUMENTS) {
+          documents.push(event);
+        }
+      }
+    }
+
+    if (
+      !topics.length &&
+      !galleries.length &&
+      !documents.length &&
+      !topicMessages.length
+    ) {
+      console.log(prefix + "nothing to send");
+      return;
+    }
+
+    logEvent({
+      type: ServerEventTypes.API_CALL,
+      metadata: {
+        endpoint: "/daily"
+      }
+    });
+
+    const transport = nodemailer.createTransport(SERVER);
+    const mail = {
+      from: process.env.EMAIL_FROM,
+      to: process.env.ADMIN_EMAILS,
+      subject: "[ateliers.lebonforum.fr] du nouveau !",
+      html: `
+    <h1>ateliers.lebonforum.fr</h1>
+
+    ${
+      topics.length > 0
+        ? `
+        <h2>Nouvelle(s) discussion(s)</h2>
+
+        <ul>
+        ${topics.map(({ metadata: { topicName: name, topicUrl: url } }) => {
+          return `<li><a href="${url}">${name}</a></li>`;
+        })}
+        </ul>
+    `
+        : ""
+    }
+
+    ${
+      topicMessages.length > 0
+        ? `
+        <h2>Nouveau(x) message(s)</h2>
+
+        <ul>
+        ${topicMessages.map(
+          ({ metadata: { topicName: name, topicUrl: url } }) => {
+            return `<li><a href="${url}">${name}</a></li>`;
+          }
+        )}
+        </ul>
+      `
+        : ""
+    }
+
+    ${
+      galleries.length > 0
+        ? `
+        <h2>Nouvelle(s) galerie(s)</h2>
+
+        <ul>
+        ${galleries.map(
+          ({ metadata: { galleryName: name, galleryUrl: url } }) => {
+            return `<li><a href="${url}">${name}</a></li>`;
+          }
+        )}
+        </ul>
+    `
+        : ""
+    }
+    ${
+      documents.length > 0
+        ? `
+        <h2>Nouvelle(s) photo(s)</h2>
+
+        <ul>
+            ${documents.map(
+              ({ metadata: { documentName: name, documentUrl: url } }) => {
+                return `<li><a href="${url}">${name}</a></li>`;
+              }
+            )}
+        </ul>
+    `
+        : ""
+    }
+    `
+    };
+
+    //if (process.env.NODE_ENV === "production")
+    await transport.sendMail(mail);
+    //else
+    console.log("🚀 ~ daily ~ mail:", mail);
+  }
+}
+
+app.listen(PORT, async () => {
   const prefix = `🚀 ~ ${new Date().toLocaleString()} ~ LISTEN `;
   console.log(prefix + PORT);
   logger.info(`Listening at http://localhost:${PORT} ; root=${root}`);
+
+  // logEvent({
+  //   type: ServerEventTypes.API_START,
+  //   metadata: {
+  //     timestamp: Date.now()
+  //   }
+  // });
+
+  while (true) {
+    daily();
+    await sleep(HOUR);
+    //await sleep(SECOND * 30);
+  }
 });
 
 {
