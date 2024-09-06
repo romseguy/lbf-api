@@ -490,9 +490,11 @@ async function daily() {
         <h2>Nouvelle(s) discussion(s)</h2>
 
         <ul>
-        ${topics.map(({ metadata: { topicName: name, topicUrl: url } }) => {
-          return `<li><a href="${url}">${name}</a></li>`;
-        })}
+          ${topics
+            .map(({ metadata: { topicName: name, topicUrl: url } }) => {
+              return `<li><a href="${url}">${name}</a></li>`;
+            })
+            .join("")}
         </ul>
     `
         : ""
@@ -504,11 +506,11 @@ async function daily() {
         <h2>Nouveau(x) message(s)</h2>
 
         <ul>
-        ${topicMessages.map(
-          ({ metadata: { topicName: name, topicUrl: url } }) => {
-            return `<li><a href="${url}">${name}</a></li>`;
-          }
-        )}
+          ${topicMessages
+            .map(({ metadata: { topicName: name, topicUrl: url } }) => {
+              return `<li><a href="${url}">${name}</a></li>`;
+            })
+            .join("")}
         </ul>
       `
         : ""
@@ -520,11 +522,11 @@ async function daily() {
         <h2>Nouvelle(s) galerie(s)</h2>
 
         <ul>
-        ${galleries.map(
-          ({ metadata: { galleryName: name, galleryUrl: url } }) => {
-            return `<li><a href="${url}">${name}</a></li>`;
-          }
-        )}
+          ${galleries
+            .map(({ metadata: { galleryName: name, galleryUrl: url } }) => {
+              return `<li><a href="${url}">${name}</a></li>`;
+            })
+            .join("")}
         </ul>
     `
         : ""
@@ -535,11 +537,11 @@ async function daily() {
         <h2>Nouvelle(s) photo(s)</h2>
 
         <ul>
-            ${documents.map(
-              ({ metadata: { documentName: name, documentUrl: url } }) => {
-                return `<li><a href="${url}">${name}</a></li>`;
-              }
-            )}
+          ${documents
+            .map(({ metadata: { documentName: name, documentUrl: url } }) => {
+              return `<li><a href="${url}">${name}</a></li>`;
+            })
+            .join("")}
         </ul>
     `
         : ""

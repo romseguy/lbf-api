@@ -4,8 +4,8 @@
   "main": "app.js",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development tsm app.ts | pino-pretty",
-    "start": "NODE_ENV=production tsm app.ts | pino-pretty"
+    "dev": "NODE_ENV=development tsx app.ts | pino-pretty",
+    "start": "NODE_ENV=production tsx app.ts | pino-pretty"
   },
   "dependencies": {
     "@dotenvx/dotenvx": "^1.7.0",
@@ -20,7 +20,7 @@
     "pino": "^8.14.1",
     "pino-pretty": "^10.0.0",
     "probe-image-size": "^7.2.3",
-    "tsm": "^2.3.0",
+    "tsx": "^4.19.0",
     "walk": "^2.3.15"
   },
   "devDependencies": {
