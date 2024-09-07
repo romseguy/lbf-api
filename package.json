@@ -1,10 +1,9 @@
 {
-  "name": "file-upload-api",
-  "version": "1.0.0",
-  "main": "app.js",
-  "license": "MIT",
+  "name": "lbf-api",
+  "private": "true",
   "scripts": {
-    "start": "tsm app.ts | pino-pretty"
+    "start": "tsx app.ts | pino-pretty",
+    "compile": "tsc --build"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -19,7 +18,6 @@
     "pino": "^8.14.1",
     "pino-pretty": "^10.0.0",
     "probe-image-size": "^7.2.3",
-    "tsm": "^2.3.0",
     "walk": "^2.3.15"
   },
   "devDependencies": {
@@ -28,7 +26,7 @@
     "@types/express-fileupload": "^1.4.2",
     "@types/glob": "^8.1.0",
     "@types/node": "^20.8.6",
-    "typescript": "^5.0.4"
+    "typescript": "4.9.5"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

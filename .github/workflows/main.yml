@@ -1,18 +1,13 @@
 name: tsc
-
 on: [push]
-
 jobs:
   tsc:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Use Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "16.x"
-      - name: Run tsc
-        run: |
-          yarn install
-          tsc --build
+          node-version: 18
+          cache: "yarn"
+      - run: yarn
+      - run: yarn compile
