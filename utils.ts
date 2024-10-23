@@ -1,5 +1,5 @@
 import { readdir, stat } from "fs/promises";
-import fs from "fs";
+import fs, { lstatSync } from "fs";
 import path from "path";
 
 export function bytesForHuman(bytes, decimals = 0) {
@@ -12,6 +12,9 @@ export function bytesForHuman(bytes, decimals = 0) {
 
   return parseFloat(bytes.toFixed(decimals)) + units[i];
 }
+
+export const isDirectory = (path) =>
+  lstatSync(path) ? lstatSync(path).isDirectory() : false;
 
 export async function directorySize(directory) {
   const files = await readdir(directory);

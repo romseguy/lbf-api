@@ -13,6 +13,7 @@ import pino from "pino";
 import stream from "stream";
 import { TypedRequestBody, TypedRequestQuery } from "./types";
 import {
+  isDirectory,
   bytesForHuman,
   directorySize,
   getSize,
@@ -21,6 +22,7 @@ import {
   toHours
 } from "./utils";
 import dotenv from "@dotenvx/dotenvx";
+import fileTypeChecker from "file-type-checker";
 dotenv.config();
 
 import { URL } from "url";
@@ -69,25 +71,25 @@ app.use(
 // app.use('/', express.static("files"))
 
 app.get("/", function getDocuments(req, res, next) {
-  // const prefix = `🚀 ~ ${new Date().toLocaleString()} ~ GET / `;
+  const prefix = `🚀 ~ ${new Date().toLocaleString()} ~ GET / `;
   // console.log(prefix + "query", req.query);
 
   const id = req.query.galleryId || req.query.eventId || req.query.orgId;
-
-  if (!id) {
-    return res.status(400).send({ message: "Vous devez indiquer un id" });
-  }
-
   const userId = req.query.userId;
 
-  if (!userId) {
+  let dir = `${root}/${id}`;
+  let subDir = `${root}/${id}/${userId}`;
+
+  if (!id) {
+    dir = root;
+    subDir = root;
+  } else if (!userId) {
     return res.status(400).send({ message: "Vous devez indiquer un userId" });
   }
 
-  const dir = `${root}/${id}`;
-  const subDir = `${root}/${id}/${userId}`;
   glob(subDir + "/*", {}, (err, filePaths) => {
     if (err) throw err;
+
     res.send(
       filePaths.map((filePath) => {
         const bytes = getSize(filePath);
@@ -123,6 +125,43 @@ app.get("/", function getDocuments(req, res, next) {
       });
     */
   }
+});
+
+app.get("/images", function getDocuments(req, res, next) {
+  let dir = root;
+  let subDir = root;
+  glob(subDir + "/*", {}, async (err, filePaths) => {
+    if (err) throw err;
+
+    //let i = 0;
+    let files = [];
+    for (const filePath of filePaths) {
+      if (isDirectory(filePath)) continue;
+      const name = path.relative(dir, filePath);
+      const bytes = getSize(filePath);
+      const ffs = fs.statSync(filePath);
+      const time = ffs.mtime.getTime();
+
+      // console.log("🚀 ~ glob ~ filePath:", filePath);
+      const url = path.resolve(filePath);
+      // console.log("🚀 ~ glob ~ url:", url);
+      const file = fs.readFileSync(url);
+      // const t = fileTypeChecker.detectFile(file);
+      // // console.log("🚀 ~ glob ~ t:", t);
+      const s = fileTypeChecker.validateFileType(file, ["png", "gif", "jpeg"]);
+      // console.log("🚀 ~ glob ~ s:", s);
+      // const s = await fileTypeFromFile(url);
+      // // console.log("🚀 ~ glob ~ s:", s, url);
+
+      if (s) {
+        // if (i > 25) continue;
+        // i = i + 1;
+        files.push({ url: name, time, bytes, isImage: s });
+      }
+    }
+
+    res.send(files);
+  });
 });
 
 app.get("/check", (req, res, next) => {
