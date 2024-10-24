@@ -11,7 +11,14 @@ import path from "path";
 import pino from "pino";
 import stream from "stream";
 import { TypedRequestBody } from "./types";
-import { bytesForHuman, directorySize, getSize, isImage } from "./utils";
+import {
+  bytesForHuman,
+  directorySize,
+  getSize,
+  isImage,
+  isDirectory
+} from "./utils";
+import fileTypeChecker from "file-type-checker";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -90,6 +97,43 @@ app.get("/", function getDocuments(req, res, next) {
       });
     */
   }
+});
+
+app.get("/images", function getDocuments(req, res, next) {
+  let dir = root;
+  let subDir = root;
+  glob(subDir + "/*", {}, async (err, filePaths) => {
+    if (err) throw err;
+
+    //let i = 0;
+    let files = [];
+    for (const filePath of filePaths) {
+      if (isDirectory(filePath)) continue;
+      const name = path.relative(dir, filePath);
+      const bytes = getSize(filePath);
+      const ffs = fs.statSync(filePath);
+      const time = ffs.mtime.getTime();
+
+      // console.log("🚀 ~ glob ~ filePath:", filePath);
+      const url = path.resolve(filePath);
+      // console.log("🚀 ~ glob ~ url:", url);
+      const file = fs.readFileSync(url);
+      // const t = fileTypeChecker.detectFile(file);
+      // // console.log("🚀 ~ glob ~ t:", t);
+      const s = fileTypeChecker.validateFileType(file, ["png", "gif", "jpeg"]);
+      // console.log("🚀 ~ glob ~ s:", s);
+      // const s = await fileTypeFromFile(url);
+      // // console.log("🚀 ~ glob ~ s:", s, url);
+
+      if (s) {
+        // if (i > 25) continue;
+        // i = i + 1;
+        files.push({ url: name, time, bytes, isImage: s });
+      }
+    }
+
+    res.send(files);
+  });
 });
 
 app.get("/check", (req, res, next) => {
