@@ -1,6 +1,6 @@
 {
   "name": "lbf-api",
-  "private": "true",
+  "packageManager": "pnpm@8.15.9",
   "scripts": {
     "start": "tsm app.ts | pino-pretty",
     "dev": "node index.js | pino-pretty",
