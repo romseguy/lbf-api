@@ -1,6 +1,6 @@
 node_modules
-bun.lockb
-yarn.lock
+content
 files
-.env*
 logs
+.env*
+tsconfig.tsbuildinfo

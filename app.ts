@@ -31,7 +31,7 @@ const __dirname = new URL(".", import.meta.url).pathname;
 
 //#region constants
 const MAX_ALLOWED_SIZE = 1000000000; // 1Gb
-const PORT = 3001;
+const PORT = 8001;
 //#endregion
 
 //#region bootstrap
